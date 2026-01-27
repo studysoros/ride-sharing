@@ -1,22 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: trip-service
+  name: payment-service
+  labels:
+    app: payment-service
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: trip-service
+      app: payment-service
   template:
     metadata:
       labels:
-        app: trip-service
+        app: payment-service
     spec:
       containers:
-        - name: trip-service
+        - name: payment-service
           image: asia-southeast1-docker.pkg.dev/ride-sharing-485401/ride-sharing/trip-service
           ports:
-            - containerPort: 9093
+            - containerPort: 9004
           resources:
             requests:
               memory: "64Mi"
@@ -25,37 +27,47 @@ spec:
               memory: "128Mi"
               cpu: "200m"
           env:
-            - name: MONGODB_URI
+            # Stripe credentials
+            - name: STRIPE_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: mongodb
-                  key: uri
+                  name: stripe-secrets
+                  key: stripe-secret-key
+
+            - name: STRIPE_SUCCESS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: STRIPE_SUCCESS_URL
+            - name: STRIPE_CANCEL_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: STRIPE_CANCEL_URL
+
+            # RabbitMQ credentials
             - name: RABBITMQ_URI
               valueFrom:
                 secretKeyRef:
                   name: rabbitmq-credentials
                   key: uri
-            - name: OSRM_API
-              valueFrom:
-                secretKeyRef:
-                  name: external-apis
-                  key: osrm
 
+            # Jaeger endpoint
             - name: JAEGER_ENDPOINT
               valueFrom:
                 configMapKeyRef:
-                  key: JAEGER_ENDPOINT
                   name: app-config
+                  key: JAEGER_ENDPOINT
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: trip-service
+  name: payment-service
 spec:
   selector:
-    app: trip-service
+    app: payment-service
   ports:
-    - port: 9093
+    - port: 9004
       name: grpc
-      targetPort: 9093
+      targetPort: 9004
   type: ClusterIP
